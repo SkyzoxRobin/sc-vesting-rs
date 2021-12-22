@@ -27,7 +27,7 @@ pub trait Vesting
 		require!(token == token_vesting, "Token send is not good")
 		let caller = self.blockchain().get_caller();
 		// periode quand la personne rentre
-		initial_period = self.blockchain().get_timestamp();
+		let initial_period = self.blockchain().get_timestamp();
 		self.start_vesting_period().insert(&initial_period);
 
 		self.user().insert(&caller, &amount)
@@ -51,7 +51,7 @@ pub trait Vesting
 
 	fn calculate_vesting_time(&self) -> SCResult<()> {
 
-		vesting_period = self.vesting_period().get();
+		let vesting_period = self.vesting_period().get();
 
 		let mut vesting_time = 0;
 
@@ -68,6 +68,7 @@ pub trait Vesting
 	#[storage_mapper("startVestingPeriod")]
 	fn start_vesting_period(&self) -> MapMapper<ManagedAddress, u64>
 
+	#[storage_mapper("vestingPeriod")]
 	fn vesting_period(&self) -> SingleValueMapper<u64>;
 
 	#[storage_mapper("tokenVested")]
