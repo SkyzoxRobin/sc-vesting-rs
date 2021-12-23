@@ -5,9 +5,14 @@
 #![no_std]
 
 elrond_wasm_node::wasm_endpoints! {
-    template
+    vesting
     (
         init
+        claimTokens
+        depositToken
+        getRemainingVestingPeriod
+        getVestedToken
+        getVestingPeriod
     )
 }
 
