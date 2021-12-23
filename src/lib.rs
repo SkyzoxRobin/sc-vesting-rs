@@ -7,14 +7,14 @@ elrond_wasm::derive_imports!();
 pub trait Vesting
  {
 	#[init]
-	fn init(
-		&self,
-		token: TokenIdentifier,
-		vesting_period: u64,
-	) {
+    fn init(
+        &self,
+        vesting_period_in_epoch: u64,
+		token: TokenIdentifier // in seconds
+    ) -> SCResult<()> {
+        require!(vesting_period > 0, "Vesting period cannot be set to zero");
+        self.vesting_period().set(&vesting_period_in_epoch);
 		self.token_vested().set(&token);
-		self.vesting_period().set(&vesting_period)
-	}
 
 	#[endpoint(depositToken)]
 	fn deposit_token(
@@ -22,13 +22,13 @@ pub trait Vesting
 		#[payment_amount] amount: BigUint,
 		token: TokenIdentifier
 		) -> SCResult<()> {
-
 		let token_vesting = self.token_vested().get();
-		require!(token == token_vesting, "Token send is not good")
+		require!(token == token_vesting, "Token sent is wrong")
+
 		let caller = self.blockchain().get_caller();
-		// periode quand la personne rentre
-		let initial_period = self.blockchain().get_timestamp();
-		self.start_vesting_period().insert(&initial_period);
+		let current_period = self.blockchain().get_block_epoch();
+
+		self.user_start_vesting().insert(&caller, &current_period);
 
 		self.user().insert(&caller, &amount)
 		Ok(())
@@ -37,36 +37,62 @@ pub trait Vesting
 	#[endpoint(claimTokens)]
 	fn claim_tokens(&self) -> SCResult<()> {
 		let caller = self.blockchain().get_caller();
-		let user_state = self.user().get(&caller);
-		require!(user_state == caller, "User has nothing to claim")
+		let user_state = self.user().get(&caller).unwrap();
+		require!(user_state == caller, "Nothing to claim")
 
 		let token = self.token_vested().get();
-		let vesting_period = self.calculate_vesting_time();
-		let user_period = self.start_vesting_period().get(&time)
-		require!(vesting_period <= user_period, "Your vesting time is not finish")
 
-		self.send().direct(&caller, &token_id, 0, &amount, &[])
+		let user_amount = self.user().get(&caller).unwrap();
+		let send_ratio = self.calculate_to_send();
+		require!(send_ratio > 0, "Nothing to claim yet");
+
+		let to_send = user_amount * BigUint::from(send_ratio);
+
+		self.send().direct(&caller, &token_id, 0, &to_send, &[])
 		Ok(())
 	}
 
-	fn calculate_vesting_time(&self) -> SCResult<()> {
+	fn calculate_to_send(&self) -> u64 {
+		let user_epoch = self.user_start_vesting().get(&caller).unwrap();
+		let current_epoch = self.blockchain().get_block_epoch();
 
+		let passed_epoch = current_epoch - user_epoch;
+
+		let mut ratio = 0u64;
+
+		if passed_epoch > (user_epoch + (180u64)) {  // 6 mois
+			let ratio = 1/4 
+		}
+		// let ratio += 1/4
+		if passed_epoch > (user_epoch + (360u64)) {  // 12 mois
+			let ratio = 1/4 + 1/4
+		}
+		if passed_epoch > (user_epoch + (540u64)) {  // 18 mois
+			let ratio = 1/4 + 1/4 + 1/4
+		}
+		if passed_epoch > (user_epoch + (720u64)) {  // 24 mois
+			let ratio = 1
+		}
+
+		}
+	}
+
+	#[view(getRemainingVestingPeriod)]
+	fn get_remaining_vesting_period(&self, address: ManagedAddress) -> u64 {
+		let user_epoch = self.user_start_vesting().get(&caller).unwrap();
 		let vesting_period = self.vesting_period().get();
+		let current_epoch = self.blockchain().get_block_epoch();
 
-		let mut vesting_time = 0;
+		let passed_epoch = current_epoch - user_epoch;
 
-		//if > 6 mois 
-		//if > 12 et plus grand que 6 mois
-		//if > 18 et plus grand que 12 mois
-		//if < 24 et plus grand que 24 mois 
-
+		vesting_period - passed_epoch
 	}
 
 	#[storage_mapper("user")]
 	fn user(&self) -> MapMapper<ManagedAddress, BigUint>;
 
 	#[storage_mapper("startVestingPeriod")]
-	fn start_vesting_period(&self) -> MapMapper<ManagedAddress, u64>
+	fn user_start_vesting(&self) -> MapMapper<ManagedAddress, u64>
 
 	#[storage_mapper("vestingPeriod")]
 	fn vesting_period(&self) -> SingleValueMapper<u64>;
